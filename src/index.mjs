@@ -4,22 +4,32 @@ import Masto from "mastodon";
 import sv from "date-fns/locale/sv/index.js";
 import p from "phin";
 
-const EUR_TO_SEK = 1 / 10.73;
+const EUR_TO_SEK = 10.73;
 
 function capitalize(s) {
   if (!s) return s;
   return s.charAt(0).toUpperCase() + s.substring(1);
 }
 
+function humanList(items) {
+  if (items.length === 0) {
+    return "";
+  } else if (items.length === 1) {
+    return items[0];
+  } else {
+    return (
+      items.slice(0, items.length - 1).join(",") +
+      " och " +
+      items[items.length - 1]
+    );
+  }
+}
+
 export default async function bot(area) {
   const priceResponse = await fetchPrices();
   const areaPriceData = getAreaPriceData(priceResponse, area);
 
-  const status = `${capitalize(
-    format(new Date(areaPriceData[0].startTime), "EEEE yyyy-MM-dd", {
-      locale: sv,
-    })
-  )}:\n\n${getMessage(areaPriceData)}`;
+  const status = getMessage(areaPriceData);
 
   sendStatus(status);
 }
@@ -73,38 +83,46 @@ export function getMessage(areaPriceData) {
 
   const peakHours = findPeakPeriods(pricePoints);
   const lowHours = findPeakPeriods(pricePoints.map((x) => -x));
+  const header = `${capitalize(
+    format(new Date(areaPriceData[0].startTime), "EEEE yyyy-MM-dd", {
+      locale: sv,
+    })
+  )}:\n\n`;
 
   if (avg < 20 && peakHours.length === 0 && lowHours === 0) {
-    return "🥰 Billigt hela dagen, kör på.";
+    return header + "🥰 Billigt hela dagen, kör på.";
   } else {
-    return [
-      `${
-        avg < 10
-          ? "🥰 Extremt billigt"
-          : avg < 20
-          ? "😊 Mycket billigt"
-          : avg < 40
-          ? "🙂 Billigt"
-          : avg < 80
-          ? "Ok pris"
-          : avg < 120
-          ? "🙁 Ganska dyrt"
-          : avg < 160
-          ? "😟 Dyrt"
-          : avg < 200
-          ? "😞 Mycket dyrt"
-          : "😭 Extremt dyrt"
-      }, ${avg.toFixed(0)} öre/kWh`,
-      "",
-      peakHours.length > 0 &&
-        `🚫 Undvik ${peakHours.map(periodToHours).join(", ")}`,
-      "",
-      lowHours.length > 0 &&
-        `✅ Föredra ${lowHours.map(periodToHours).join(", ")}`,
-      "",
-    ]
-      .filter((l) => l !== false)
-      .join("\n");
+    return (
+      header +
+      [
+        `${
+          avg < 10
+            ? "🥰 Extremt billigt"
+            : avg < 20
+            ? "😊 Mycket billigt"
+            : avg < 40
+            ? "🙂 Billigt"
+            : avg < 80
+            ? "Ok pris"
+            : avg < 120
+            ? "🙁 Ganska dyrt"
+            : avg < 160
+            ? "😟 Dyrt"
+            : avg < 200
+            ? "😞 Mycket dyrt"
+            : "😭 Extremt dyrt"
+        }, ${avg.toFixed(0)} öre/kWh`,
+        "",
+        peakHours.length > 0 &&
+          `🚫 Undvik klockan ${humanList(peakHours.map(periodToHours))}`,
+        "",
+        lowHours.length > 0 &&
+          `✅ Föredra klockan ${humanList(lowHours.map(periodToHours))}`,
+        "",
+      ]
+        .filter((l) => l !== false)
+        .join("\n")
+    );
   }
 
   function periodToHours({ start, end }) {
@@ -139,4 +157,5 @@ function findPeakPeriods(points) {
   return hiPeriods;
 }
 
-const priceDataToPricePoint = ({ price }) => ((price * EUR_TO_SEK) / 10) * 100;
+const priceDataToPricePoint = ({ price }) =>
+  ((price * EUR_TO_SEK) / 1000) * 100;
