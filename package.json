@@ -1,0 +1,15 @@
+{
+  "name": "elbot",
+  "version": "1.0.0",
+  "description": "Electricity Price Bot",
+  "main": "src/index.mjs",
+  "author": "Per Liedman <per@liedman.net>",
+  "license": "AGPL-3.0",
+  "dependencies": {
+    "date-fns": "^2.29.3",
+    "mastodon": "^1.2.2",
+    "oauth": "^0.10.0",
+    "phin": "^3.6.1",
+    "simple-statistics": "^7.8.0"
+  }
+}
