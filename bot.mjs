@@ -1,6 +1,6 @@
 import { fetchPrices, getAreaPriceData, getMessage } from "./src/index.mjs";
 
-const [, areaName] = process.argv;
+const [,, areaName] = process.argv;
 
 const data = await fetchPrices();
 const areaPriceData = getAreaPriceData(data, areaName);
