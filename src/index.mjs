@@ -137,12 +137,14 @@ export function getMessage(areaPriceData) {
 
 function findPeakPeriods(points) {
   const [min] = extent(points);
+  const avg = mean(points);
   const stdDev = standardDeviation(points);
+  const minDiff = Math.max(avg * 0.25, 1.7 * stdDev);
   const hiPeriods = [];
   let currentPeriod;
   for (let i = 0; i < points.length; i++) {
     const pricePoint = points[i];
-    if (pricePoint > min + 1.7 * stdDev) {
+    if (pricePoint > min + minDiff) {
       if (currentPeriod) {
         currentPeriod.end = i;
       } else {
