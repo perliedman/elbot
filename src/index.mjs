@@ -1,8 +1,9 @@
-import { format } from "date-fns";
+import { addDays, addHours, format, startOfDay } from "date-fns";
 import { extent, mean, standardDeviation } from "simple-statistics";
 import Masto from "mastodon";
 import sv from "date-fns/locale/sv/index.js";
 import p from "phin";
+import { DOMParser } from "xmldom";
 
 const EUR_TO_SEK = 10.73;
 
@@ -34,41 +35,51 @@ export default async function bot(area) {
   sendStatus(status);
 }
 
-export async function fetchPrices() {
-  const res = await p(
-    "https://www.nordpoolgroup.com/api/marketdata/page/10?currency=,,,EUR"
-  );
+export async function fetchPrices(securityToken) {
+  const now = new Date();
+  const tomorrowStart = startOfDay(addDays(now, 1));
+  const tomorrowEnd = addDays(tomorrowStart, 1);
+  const url = `https://web-api.tp.entsoe.eu/api?securityToken=${securityToken}&documentType=A44&in_Domain=10Y1001A1001A46L&out_Domain=10Y1001A1001A46L&periodStart=${format(
+    tomorrowStart,
+    "yyyyMMddHHmm"
+  )}&periodEnd=${format(tomorrowEnd, "yyyyMMddHHmm")}`;
+  const res = await p(url);
 
   if (res.statusCode !== 200) {
     throw new Error(`Unexpected HTTP response ${res.statusCode}.`);
   }
 
-  return JSON.parse(res.body);
+  return new DOMParser().parseFromString(res.body.toString());
 }
 
-export function sendStatus(status) {
+export function sendStatus(status, accessToken, apiUrl) {
   const M = new Masto({
-    access_token: process.env.MASTODON_ACCESS_TOKEN,
-    api_url: process.env.MASTODON_API_URL,
+    access_token: accessToken,
+    api_url: apiUrl,
   });
 
   M.post("statuses", { status });
 }
 
-export function getAreaPriceData(priceResponse, area) {
-  return priceResponse.data.Rows.filter(({ Name: name }) =>
-    /[0-9]+&nbsp;-&nbsp;[0-9]+/.exec(name)
-  ).map(({ StartTime: startTime, EndTime: endTime, Columns: columns }) => {
-    const areaColumn = columns.find(({ Name: name }) => name === area);
-    if (!areaColumn) {
-      throw new Error(`No column matches area name "${area}".`);
-    }
-    return {
-      startTime,
-      endTime,
-      price: Number(areaColumn.Value.replace(",", ".")),
-    };
-  });
+export function getAreaPriceData(priceResponseDoc) {
+  const timeIntervalEl =
+    priceResponseDoc.getElementsByTagName("timeInterval")[0];
+  const start = new Date(
+    timeIntervalEl.getElementsByTagName("start")[0].textContent
+  );
+  const resolution =
+    priceResponseDoc.getElementsByTagName("resolution")[0].textContent;
+
+  if (resolution !== "PT60M") {
+    throw new Error(`Unexpected resolution "${resolution}".`);
+  }
+
+  const pointEls = priceResponseDoc.getElementsByTagName("Point");
+  return Array.from(pointEls).map((pointEl, i) => ({
+    start: addHours(start, i),
+    end: addHours(start, i + 1),
+    price: Number(pointEl.getElementsByTagName("price.amount")[0].textContent),
+  }));
 }
 
 export function getMessage(areaPriceData) {
@@ -84,7 +95,7 @@ export function getMessage(areaPriceData) {
   const peakHours = findPeakPeriods(pricePoints);
   const lowHours = findPeakPeriods(pricePoints.map((x) => -x));
   const header = `${capitalize(
-    format(new Date(areaPriceData[0].startTime), "EEEE yyyy-MM-dd", {
+    format(areaPriceData[0].start, "EEEE yyyy-MM-dd", {
       locale: sv,
     })
   )}:\n\n`;
@@ -128,8 +139,8 @@ export function getMessage(areaPriceData) {
   function periodToHours({ start, end }) {
     const a = areaPriceData[start];
     const b = areaPriceData[end];
-    return `${format(new Date(a.startTime), "HH")}-${format(
-      new Date(b.endTime),
+    return `${format(new Date(a.start), "HH")}-${format(
+      new Date(b.end),
       "HH"
     )}`;
   }

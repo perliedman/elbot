@@ -1,9 +1,11 @@
 import { fetchPrices, getAreaPriceData, getMessage } from "./src/index.mjs";
-import data from "./test/data/221113.json" assert { type: "json" };
+import * as dotenv from "dotenv";
 
-const [, , areaName] = process.argv;
+dotenv.config();
 
-// const data = await fetchPrices();
+const [, , accessToken, areaName] = process.argv;
+
+const data = await fetchPrices(process.env.ENTSOE_TOKEN);
 const areaPriceData = getAreaPriceData(data, areaName);
 console.log(`
 <html>
