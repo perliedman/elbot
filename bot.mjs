@@ -10,11 +10,12 @@ const areaPriceData = getAreaPriceData(data, areaName);
 console.log(`
 <html>
   <head>
+    <meta charset="utf-8" />
     <style>
       body {
         background-color: #111128;
         font-size: 48px;
-        color: #48486f;
+        color: #525278;
       }
       ul {
         list-style: none;
