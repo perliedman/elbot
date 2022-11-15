@@ -150,7 +150,7 @@ function findPeakPeriods(points) {
   const [min] = extent(points);
   const avg = mean(points);
   const stdDev = standardDeviation(points);
-  const minDiff = Math.max(avg * 0.25, 1.7 * stdDev);
+  const minDiff = Math.max(avg * 0.8, 2 * stdDev);
   const hiPeriods = [];
   let currentPeriod;
   for (let i = 0; i < points.length; i++) {
