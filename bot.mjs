@@ -42,8 +42,11 @@ console.log(`
   </body>
 </html>`);
 
-await sendStatus(
-  message,
-  process.env.MASTODON_ACCESS_TOKEN,
-  process.env.MASTODON_API_URL
-);
+if (process.argv[1] === '--send') {
+  await sendStatus(
+    message,
+    process.env.MASTODON_ACCESS_TOKEN,
+    process.env.MASTODON_API_URL
+  );
+}
+
