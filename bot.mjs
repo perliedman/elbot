@@ -5,13 +5,22 @@ import {
   sendStatus,
 } from "./src/index.mjs";
 import * as dotenv from "dotenv";
+import minimist from "minimist";
+import { addDays } from "date-fns";
+
+const argv = minimist(process.argv.slice(2));
 
 dotenv.config();
 
-const data = await fetchPrices(process.env.ENTSOE_TOKEN);
+const now = new Date();
+const costDate = now.getUTCHours() < 13 ? now : addDays(now, 1);
+
+const data = await fetchPrices(process.env.ENTSOE_TOKEN, costDate);
 const areaPriceData = getAreaPriceData(data);
 const message = getMessage(areaPriceData);
-console.log(`
+
+if (argv.html) {
+  console.log(`
 <html>
   <head>
     <meta charset="utf-8" />
@@ -41,9 +50,14 @@ console.log(`
     </ul>
   </body>
 </html>`);
+} else {
+  console.log(message);
+}
 
-await sendStatus(
-  message,
-  process.env.MASTODON_ACCESS_TOKEN,
-  process.env.MASTODON_API_URL
-);
+if (argv.send) {
+  await sendStatus(
+    message,
+    process.env.MASTODON_ACCESS_TOKEN,
+    process.env.MASTODON_API_URL
+  );
+}

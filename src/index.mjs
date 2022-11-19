@@ -3,7 +3,7 @@ import { extent, mean, standardDeviation } from "simple-statistics";
 import Masto from "mastodon";
 import sv from "date-fns/locale/sv/index.js";
 import p from "phin";
-import { DOMParser } from "xmldom";
+import { DOMParser, XMLSerializer } from "xmldom";
 
 const EUR_TO_SEK = 10.73;
 
@@ -43,14 +43,13 @@ function humanList(items) {
   }
 }
 
-export async function fetchPrices(securityToken) {
-  const now = new Date();
-  const tomorrowStart = startOfDay(addDays(now, 1));
-  const tomorrowEnd = addDays(tomorrowStart, 1);
+export async function fetchPrices(securityToken, date) {
+  const start = startOfDay(date);
+  const end = addDays(start, 1);
   const url = `https://web-api.tp.entsoe.eu/api?securityToken=${securityToken}&documentType=A44&in_Domain=10Y1001A1001A46L&out_Domain=10Y1001A1001A46L&periodStart=${format(
-    tomorrowStart,
+    start,
     "yyyyMMddHHmm"
-  )}&periodEnd=${format(tomorrowEnd, "yyyyMMddHHmm")}`;
+  )}&periodEnd=${format(end, "yyyyMMddHHmm")}`;
   const res = await p(url);
 
   if (res.statusCode !== 200) {
@@ -70,8 +69,17 @@ export function sendStatus(status, accessToken, apiUrl) {
 }
 
 export function getAreaPriceData(priceResponseDoc) {
-  const timeIntervalEl =
-    priceResponseDoc.getElementsByTagName("timeInterval")[0];
+  const timeEls = priceResponseDoc.getElementsByTagName("timeInterval");
+
+  if (timeEls.length < 1) {
+    throw new Error(
+      `Could not find timeInterval element in XML: ${new XMLSerializer().serializeToString(
+        priceResponseDoc
+      )}`
+    );
+  }
+
+  const timeIntervalEl = timeEls[0];
   const start = new Date(
     timeIntervalEl.getElementsByTagName("start")[0].textContent
   );
