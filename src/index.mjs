@@ -7,6 +7,23 @@ import { DOMParser } from "xmldom";
 
 const EUR_TO_SEK = 10.73;
 
+const PRICE_DESCRIPTION = [
+  [10, "🥰 Extremt billigt"],
+  [20, "😊 Mycket billigt"],
+  [40, "🙂 Billigt"],
+  [80, "Ok pris"],
+  [120, "🙁 Ganska dyrt"],
+  [160, "😟 Dyrt"],
+  [200, "😞 Mycket dyrt"],
+  [Number.MAX_SAFE_INTEGER, "😭 Extremt dyrt"],
+];
+
+export function priceDescription(x) {
+  let i;
+  for (i = 0; x >= PRICE_DESCRIPTION[i][0]; i++);
+  return PRICE_DESCRIPTION[i][1];
+}
+
 function capitalize(s) {
   if (!s) return s;
   return s.charAt(0).toUpperCase() + s.substring(1);
@@ -24,15 +41,6 @@ function humanList(items) {
       items[items.length - 1]
     );
   }
-}
-
-export default async function bot(area) {
-  const priceResponse = await fetchPrices();
-  const areaPriceData = getAreaPriceData(priceResponse, area);
-
-  const status = getMessage(areaPriceData);
-
-  sendStatus(status);
 }
 
 export async function fetchPrices(securityToken) {
@@ -106,23 +114,7 @@ export function getMessage(areaPriceData) {
     return (
       header +
       [
-        `${
-          avg < 10
-            ? "🥰 Extremt billigt"
-            : avg < 20
-            ? "😊 Mycket billigt"
-            : avg < 40
-            ? "🙂 Billigt"
-            : avg < 80
-            ? "Ok pris"
-            : avg < 120
-            ? "🙁 Ganska dyrt"
-            : avg < 160
-            ? "😟 Dyrt"
-            : avg < 200
-            ? "😞 Mycket dyrt"
-            : "😭 Extremt dyrt"
-        }, ${avg.toFixed(0)} öre/kWh`,
+        `${priceDescription(avg)}, ${avg.toFixed(0)} öre/kWh`,
         "",
         peakHours.length > 0 &&
           `🚫 Undvik klockan ${humanList(peakHours.map(periodToHours))}`,
