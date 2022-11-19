@@ -18,10 +18,18 @@ const PRICE_DESCRIPTION = [
   [Number.MAX_SAFE_INTEGER, "😭 Extremt dyrt"],
 ];
 
+// Energiskatt + elöverföringsavgift
+// https://www.eon.se/content/dam/eon-se/swe-documents/swe-prislista-lag-syd-220701.pdf
+const PRICE_OVERHEAD_KWH = 45 + 82;
+
 export function priceDescription(x) {
   let i;
   for (i = 0; x >= PRICE_DESCRIPTION[i][0]; i++);
   return PRICE_DESCRIPTION[i][1];
+}
+
+export function priceOfShower(pricePerKWh) {
+  return (10 / 60) * 25 * (pricePerKWh + PRICE_OVERHEAD_KWH);
 }
 
 function capitalize(s) {
@@ -105,7 +113,6 @@ export function getMessage(areaPriceData) {
 
   // Recalculate to swedish öre / kWh
   const pricePoints = areaPriceData.map(priceDataToPricePoint);
-  const [min, max] = extent(pricePoints);
   const avg = mean(pricePoints);
 
   const peakHours = findPeakPeriods(pricePoints);
@@ -122,7 +129,9 @@ export function getMessage(areaPriceData) {
     return (
       header +
       [
-        `${priceDescription(avg)}, ${avg.toFixed(0)} öre/kWh`,
+        `${priceDescription(avg)}, ${avg.toFixed(0)} öre/kWh (ca ${(
+          priceOfShower(avg) / 100
+        ).toFixed(0)} kr för en dusch)`,
         "",
         peakHours.length > 0 &&
           `🚫 Undvik klockan ${humanList(peakHours.map(periodToHours))}`,
