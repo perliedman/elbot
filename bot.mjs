@@ -6,7 +6,10 @@ import {
 } from "./src/index.mjs";
 import * as dotenv from "dotenv";
 import minimist from "minimist";
-import { addDays } from "date-fns";
+import { addDays, format } from "date-fns";
+import fs from "fs/promises";
+import chart from "./src/chart.mjs";
+import sharp from "sharp";
 
 const argv = minimist(process.argv.slice(2));
 
@@ -54,9 +57,18 @@ if (argv.html) {
   console.log(message);
 }
 
+const chartName = `${format(costDate, "yyyy-MM-dd")}`;
+const chartPng = chartName + ".png";
+if (argv.chart || argv.send) {
+  const chartSvg = chart(areaPriceData);
+  await fs.writeFile(chartName + ".svg", chartSvg);
+  sharp(Buffer.from(chartSvg)).toFile(chartPng);
+}
+
 if (argv.send) {
   await sendStatus(
     message,
+    chartPng,
     process.env.MASTODON_ACCESS_TOKEN,
     process.env.MASTODON_API_URL
   );

@@ -1,9 +1,10 @@
 import { addDays, addHours, format, startOfDay } from "date-fns";
 import { extent, mean, standardDeviation } from "simple-statistics";
-import Masto from "mastodon";
 import sv from "date-fns/locale/sv/index.js";
 import p from "phin";
 import { DOMParser, XMLSerializer } from "xmldom";
+import { login } from "masto";
+import { createReadStream } from "fs";
 
 const EUR_TO_SEK = 10.73;
 
@@ -67,13 +68,17 @@ export async function fetchPrices(securityToken, date) {
   return new DOMParser().parseFromString(res.body.toString());
 }
 
-export function sendStatus(status, accessToken, apiUrl) {
-  const M = new Masto({
-    access_token: accessToken,
-    api_url: apiUrl,
-  });
+export async function sendStatus(status, chartFile, accessToken, apiUrl) {
+  const client = await login({ url: apiUrl, accessToken });
 
-  M.post("statuses", { status });
+  try {
+    const { id } = await client.mediaAttachments.create({
+      file: createReadStream(chartFile),
+    });
+    await client.statuses.create({ status, mediaIds: [id] });
+  } catch (error) {
+    console.error(error.response);
+  }
 }
 
 export function getAreaPriceData(priceResponseDoc) {
