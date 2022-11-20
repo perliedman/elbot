@@ -5,13 +5,25 @@ import {
   sendStatus,
 } from "./src/index.mjs";
 import * as dotenv from "dotenv";
+import minimist from "minimist";
+import { addDays, format } from "date-fns";
+import fs from "fs/promises";
+import chart from "./src/chart.mjs";
+import sharp from "sharp";
+
+const argv = minimist(process.argv.slice(2));
 
 dotenv.config();
 
-const data = await fetchPrices(process.env.ENTSOE_TOKEN);
+const now = new Date();
+const costDate = now.getUTCHours() < 13 ? now : addDays(now, 1);
+
+const data = await fetchPrices(process.env.ENTSOE_TOKEN, costDate);
 const areaPriceData = getAreaPriceData(data);
 const message = getMessage(areaPriceData);
-console.log(`
+
+if (argv.html) {
+  console.log(`
 <html>
   <head>
     <meta charset="utf-8" />
@@ -41,12 +53,23 @@ console.log(`
     </ul>
   </body>
 </html>`);
+} else {
+  console.log(message);
+}
 
-if (process.argv[1] === '--send') {
+const chartName = `${format(costDate, "yyyy-MM-dd")}`;
+const chartPng = chartName + ".png";
+if (argv.chart || argv.send) {
+  const chartSvg = chart(areaPriceData);
+  await fs.writeFile(chartName + ".svg", chartSvg);
+  sharp(Buffer.from(chartSvg)).toFile(chartPng);
+}
+
+if (argv.send) {
   await sendStatus(
     message,
+    chartPng,
     process.env.MASTODON_ACCESS_TOKEN,
     process.env.MASTODON_API_URL
   );
 }
-

@@ -1,11 +1,37 @@
 import { addDays, addHours, format, startOfDay } from "date-fns";
 import { extent, mean, standardDeviation } from "simple-statistics";
-import Masto from "mastodon";
 import sv from "date-fns/locale/sv/index.js";
 import p from "phin";
-import { DOMParser } from "xmldom";
+import { DOMParser, XMLSerializer } from "xmldom";
+import { login } from "masto";
+import { createReadStream } from "fs";
 
 const EUR_TO_SEK = 10.73;
+
+const PRICE_DESCRIPTION = [
+  [10, "🥰 Extremt billigt"],
+  [20, "😊 Mycket billigt"],
+  [40, "🙂 Billigt"],
+  [80, "Ok pris"],
+  [120, "🙁 Ganska dyrt"],
+  [160, "😟 Dyrt"],
+  [200, "😞 Mycket dyrt"],
+  [Number.MAX_SAFE_INTEGER, "😭 Extremt dyrt"],
+];
+
+// Energiskatt + elöverföringsavgift
+// https://www.eon.se/content/dam/eon-se/swe-documents/swe-prislista-lag-syd-220701.pdf
+const PRICE_OVERHEAD_KWH = 45 + 82;
+
+export function priceDescription(x) {
+  let i;
+  for (i = 0; x >= PRICE_DESCRIPTION[i][0]; i++);
+  return PRICE_DESCRIPTION[i][1];
+}
+
+export function priceOfShower(pricePerKWh) {
+  return (10 / 60) * 25 * (pricePerKWh + PRICE_OVERHEAD_KWH);
+}
 
 function capitalize(s) {
   if (!s) return s;
@@ -26,23 +52,13 @@ function humanList(items) {
   }
 }
 
-export default async function bot(area) {
-  const priceResponse = await fetchPrices();
-  const areaPriceData = getAreaPriceData(priceResponse, area);
-
-  const status = getMessage(areaPriceData);
-
-  sendStatus(status);
-}
-
-export async function fetchPrices(securityToken) {
-  const now = new Date();
-  const tomorrowStart = startOfDay(addDays(now, 1));
-  const tomorrowEnd = addDays(tomorrowStart, 1);
+export async function fetchPrices(securityToken, date) {
+  const start = startOfDay(date);
+  const end = addDays(start, 1);
   const url = `https://web-api.tp.entsoe.eu/api?securityToken=${securityToken}&documentType=A44&in_Domain=10Y1001A1001A46L&out_Domain=10Y1001A1001A46L&periodStart=${format(
-    tomorrowStart,
+    start,
     "yyyyMMddHHmm"
-  )}&periodEnd=${format(tomorrowEnd, "yyyyMMddHHmm")}`;
+  )}&periodEnd=${format(end, "yyyyMMddHHmm")}`;
   const res = await p(url);
 
   if (res.statusCode !== 200) {
@@ -52,18 +68,31 @@ export async function fetchPrices(securityToken) {
   return new DOMParser().parseFromString(res.body.toString());
 }
 
-export function sendStatus(status, accessToken, apiUrl) {
-  const M = new Masto({
-    access_token: accessToken,
-    api_url: apiUrl,
-  });
+export async function sendStatus(status, chartFile, accessToken, apiUrl) {
+  const client = await login({ url: apiUrl, accessToken });
 
-  M.post("statuses", { status });
+  try {
+    const { id } = await client.mediaAttachments.create({
+      file: createReadStream(chartFile),
+    });
+    await client.statuses.create({ status, mediaIds: [id] });
+  } catch (error) {
+    console.error(error.response);
+  }
 }
 
 export function getAreaPriceData(priceResponseDoc) {
-  const timeIntervalEl =
-    priceResponseDoc.getElementsByTagName("timeInterval")[0];
+  const timeEls = priceResponseDoc.getElementsByTagName("timeInterval");
+
+  if (timeEls.length < 1) {
+    throw new Error(
+      `Could not find timeInterval element in XML: ${new XMLSerializer().serializeToString(
+        priceResponseDoc
+      )}`
+    );
+  }
+
+  const timeIntervalEl = timeEls[0];
   const start = new Date(
     timeIntervalEl.getElementsByTagName("start")[0].textContent
   );
@@ -89,7 +118,6 @@ export function getMessage(areaPriceData) {
 
   // Recalculate to swedish öre / kWh
   const pricePoints = areaPriceData.map(priceDataToPricePoint);
-  const [min, max] = extent(pricePoints);
   const avg = mean(pricePoints);
 
   const peakHours = findPeakPeriods(pricePoints);
@@ -106,23 +134,9 @@ export function getMessage(areaPriceData) {
     return (
       header +
       [
-        `${
-          avg < 10
-            ? "🥰 Extremt billigt"
-            : avg < 20
-            ? "😊 Mycket billigt"
-            : avg < 40
-            ? "🙂 Billigt"
-            : avg < 80
-            ? "Ok pris"
-            : avg < 120
-            ? "🙁 Ganska dyrt"
-            : avg < 160
-            ? "😟 Dyrt"
-            : avg < 200
-            ? "😞 Mycket dyrt"
-            : "😭 Extremt dyrt"
-        }, ${avg.toFixed(0)} öre/kWh`,
+        `${priceDescription(avg)}, ${avg.toFixed(0)} öre/kWh (ca ${(
+          priceOfShower(avg) / 100
+        ).toFixed(0)} kr för en dusch)`,
         "",
         peakHours.length > 0 &&
           `🚫 Undvik klockan ${humanList(peakHours.map(periodToHours))}`,
