@@ -23,7 +23,7 @@ function AreaChart(
     x = ([x]) => x, // given d in data, returns the (temporal) x-value
     y = ([, y]) => y, // given d in data, returns the (quantitative) y-value
     defined, // given d in data, returns true if defined (for gaps)
-    curve = d3.curveLinear, // method of interpolation between points
+    curve = d3.curveStepAfter, // method of interpolation between points
     marginTop = 20, // top margin, in pixels
     marginRight = 30, // right margin, in pixels
     marginBottom = 30, // bottom margin, in pixels
