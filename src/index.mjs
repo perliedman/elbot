@@ -16,7 +16,8 @@ const PRICE_DESCRIPTION = [
   [120, "🙁 Ganska dyrt"],
   [160, "😟 Dyrt"],
   [200, "😞 Mycket dyrt"],
-  [Number.MAX_SAFE_INTEGER, "😭 Extremt dyrt"],
+  [500, "😭 Extremt dyrt"],
+  [Number.MAX_SAFE_INTEGER, "🤯 Katastrofdyrt"],
 ];
 
 // Energiskatt + elöverföringsavgift
