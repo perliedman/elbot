@@ -66,10 +66,12 @@ if (argv.chart || argv.send) {
 }
 
 if (argv.send) {
-  await sendStatus(
-    message,
-    chartPng,
-    process.env.MASTODON_ACCESS_TOKEN,
-    process.env.MASTODON_API_URL
-  );
+  const mastodonConfig = JSON.parse(await fs.readFile("mastodon.json"));
+  const accountConfig = mastodonConfig[argv.send];
+  if (!accountConfig) {
+    throw new Error(`Unknown mastodon config ${argv.send}.`);
+  }
+  const { accessToken, apiUrl } = accountConfig;
+
+  await sendStatus(message, chartPng, accessToken, apiUrl);
 }
