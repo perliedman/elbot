@@ -83,15 +83,10 @@ export async function fetchPrices(securityToken, date, area) {
 
 export async function sendStatus(status, chartFile, accessToken, apiUrl) {
   const client = await login({ url: apiUrl, accessToken });
-
-  try {
-    const { id } = await client.mediaAttachments.create({
-      file: createReadStream(chartFile),
-    });
-    await client.statuses.create({ status, mediaIds: [id] });
-  } catch (error) {
-    console.error(error.response);
-  }
+  const { id } = await client.mediaAttachments.create({
+    file: createReadStream(chartFile),
+  });
+  await client.statuses.create({ status, mediaIds: [id] });
 }
 
 export function getAreaPriceData(priceResponseDoc) {

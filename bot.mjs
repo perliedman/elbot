@@ -79,5 +79,9 @@ if (argv.send) {
   }
   const { accessToken, apiUrl } = accountConfig;
 
-  await sendStatus(message, chartPng, accessToken, apiUrl);
+  try {
+    await sendStatus(message, chartPng, accessToken, apiUrl);
+  } catch (error) {
+    console.error("Failed to send to Mastodon:", error);
+  }
 }
