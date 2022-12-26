@@ -6,7 +6,7 @@ import {
 } from "./src/index.mjs";
 import * as dotenv from "dotenv";
 import minimist from "minimist";
-import { addDays, format } from "date-fns";
+import { addDays, addHours, format } from "date-fns";
 import fs from "fs/promises";
 import chart from "./src/chart.mjs";
 import sharp from "sharp";
@@ -60,7 +60,13 @@ if (argv.html) {
 const chartName = `${format(costDate, "yyyy-MM-dd")}`;
 const chartPng = chartName + ".png";
 if (argv.chart || argv.send) {
-  const chartSvg = chart(areaPriceData);
+  const last = areaPriceData[areaPriceData.length - 1];
+  const hourAfterLast = addHours(last.start, 1);
+  const paddedPriceData = [
+    ...areaPriceData,
+    { start: hourAfterLast, price: last.price },
+  ];
+  const chartSvg = chart(paddedPriceData);
   await fs.writeFile(chartName + ".svg", chartSvg);
   sharp(Buffer.from(chartSvg)).toFile(chartPng);
 }
