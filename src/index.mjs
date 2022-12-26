@@ -53,10 +53,22 @@ function humanList(items) {
   }
 }
 
-export async function fetchPrices(securityToken, date) {
+const areaToDomain = {
+  SE1: "10Y1001A1001A44P",
+  SE2: "10Y1001A1001A45N",
+  SE3: "10Y1001A1001A46L",
+  SE4: "10Y1001A1001A47J",
+};
+
+export async function fetchPrices(securityToken, date, area) {
+  const domain = areaToDomain[area];
+  if (!domain) {
+    throw new Error(`Unknown area "${area}".`);
+  }
+
   const start = startOfDay(date);
   const end = addDays(start, 1);
-  const url = `https://web-api.tp.entsoe.eu/api?securityToken=${securityToken}&documentType=A44&in_Domain=10Y1001A1001A46L&out_Domain=10Y1001A1001A46L&periodStart=${format(
+  const url = `https://web-api.tp.entsoe.eu/api?securityToken=${securityToken}&documentType=A44&in_Domain=${domain}&out_Domain=${domain}&periodStart=${format(
     start,
     "yyyyMMddHHmm"
   )}&periodEnd=${format(end, "yyyyMMddHHmm")}`;

@@ -18,7 +18,7 @@ dotenv.config();
 const now = new Date();
 const costDate = now.getUTCHours() < 13 ? now : addDays(now, 1);
 
-const data = await fetchPrices(process.env.ENTSOE_TOKEN, costDate);
+const data = await fetchPrices(process.env.ENTSOE_TOKEN, costDate, argv.area);
 const areaPriceData = getAreaPriceData(data);
 const message = getMessage(areaPriceData);
 
