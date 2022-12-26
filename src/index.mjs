@@ -6,7 +6,7 @@ import { DOMParser, XMLSerializer } from "xmldom";
 import { login } from "masto";
 import { createReadStream } from "fs";
 
-const EUR_TO_SEK = 10.73;
+const EUR_TO_SEK = 11.17;
 
 const PRICE_DESCRIPTION = [
   [10, "🥰 Extremt billigt"],
