@@ -163,7 +163,7 @@ export function getMessage(areaPriceData) {
     const b = areaPriceData[end];
     return `${format(new Date(a.start), "HH")}-${format(
       new Date(b.end),
-      "HH"
+      "kk"
     )}`;
   }
 }
