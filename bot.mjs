@@ -1,6 +1,7 @@
 import {
   fetchPrices,
   getAreaPriceData,
+  getEuroConversionRates,
   getIntervalMinutes,
   getMessage,
   sendStatus,
@@ -20,11 +21,13 @@ dotenv.config();
 const now = new Date();
 const costDate = now.getUTCHours() < 13 ? now : addDays(now, 1);
 
+const eurToSek = (await getEuroConversionRates()).sek;
+
 const data = await fetchPrices(process.env.ENTSOE_TOKEN, costDate, argv.area);
 const intervalMinutes = getIntervalMinutes(data);
 const areaPriceData = getAreaPriceData(data, intervalMinutes);
 const pricePoints = toPricePoints(areaPriceData, intervalMinutes);
-const message = getMessage(pricePoints);
+const message = getMessage(pricePoints, eurToSek);
 
 if (argv.html) {
   console.log(`

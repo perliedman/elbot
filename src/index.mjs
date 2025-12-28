@@ -1,6 +1,5 @@
 import {
   addDays,
-  addHours,
   addMinutes,
   format,
   intervalToDuration,
@@ -12,8 +11,6 @@ import p from "phin";
 import { DOMParser, XMLSerializer } from "xmldom";
 import { login } from "masto";
 import { createReadStream } from "fs";
-
-const EUR_TO_SEK = 11.03;
 
 const PRICE_DESCRIPTION = [
   [10, "🥰 Extremt billigt"],
@@ -66,6 +63,18 @@ const areaToDomain = {
   SE3: "10Y1001A1001A46L",
   SE4: "10Y1001A1001A47J",
 };
+
+export async function getEuroConversionRates() {
+  const res = await p(
+    "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/eur.json"
+  );
+
+  if (res.statusCode !== 200) {
+    throw new Error(`Unexpected HTTP response ${res.statusCode}.`);
+  }
+
+  return JSON.parse(res.body.toString()).eur;
+}
 
 export async function fetchPrices(securityToken, date, area) {
   const domain = areaToDomain[area];
@@ -199,9 +208,9 @@ export function toPricePoints(areaPriceData, intervalMinutes) {
  * intervals are of the same length (as returned by `toPricePoints`)
  * @returns {string} describing the day's prices
  */
-export function getMessage(pricePoints) {
+export function getMessage(pricePoints, eurToSek) {
   // Recalculate to swedish öre / kWh
-  const sekPrices = pricePoints.map(priceDataToPricePoint);
+  const sekPrices = pricePoints.map((p) => priceDataToPricePoint(eurToSek, p));
   const avg = mean(sekPrices);
 
   const peakHours = findPeakPeriods(pricePoints);
@@ -288,5 +297,5 @@ function findPeakPeriods(points, windowSize = 4) {
   return hiPeriods;
 }
 
-const priceDataToPricePoint = ({ price }) =>
-  ((price * EUR_TO_SEK) / 1000) * 100;
+const priceDataToPricePoint = (eurToSek, { price }) =>
+  ((price * eurToSek) / 1000) * 100;

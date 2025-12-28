@@ -3,6 +3,7 @@ import { DOMParser } from "xmldom";
 import { expect, test } from "vitest";
 import {
   getAreaPriceData,
+  getEuroConversionRates,
   getIntervalMinutes,
   getMessage,
   toPricePoints,
@@ -68,8 +69,17 @@ test("getMessage", () => {
   const priceData = getAreaPriceData(doc);
   const pricePoints = toPricePoints(priceData, 15);
 
-  const message = getMessage(pricePoints);
+  const message = getMessage(pricePoints, 11.03);
   expect(message).toContain("😊");
   expect(message).toContain("12 öre/kWh");
   expect(message).toContain("6 kr");
+});
+
+test("getEuroConversionRates", async () => {
+  const rates = await getEuroConversionRates();
+  expect(rates).toBeDefined();
+  expect(rates.sek).toBeDefined();
+  expect(rates.sek).toBeTypeOf("number");
+  expect(rates.sek).toBeGreaterThan(5);
+  expect(rates.sek).toBeLessThan(15);
 });
