@@ -5,6 +5,9 @@
   "main": "src/index.mjs",
   "author": "Per Liedman <per@liedman.net>",
   "license": "AGPL-3.0",
+  "scripts": {
+    "test": "vitest"
+  },
   "dependencies": {
     "d3": "^7.6.1",
     "d3-node": "^3.0.0",
@@ -17,5 +20,8 @@
     "sharp": "^0.31.2",
     "simple-statistics": "^7.8.0",
     "xmldom": "^0.6.0"
+  },
+  "devDependencies": {
+    "vitest": "^4.0.16"
   }
 }

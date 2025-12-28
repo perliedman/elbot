@@ -1,8 +1,10 @@
 import {
   fetchPrices,
   getAreaPriceData,
+  getIntervalMinutes,
   getMessage,
   sendStatus,
+  toPricePoints,
 } from "./src/index.mjs";
 import * as dotenv from "dotenv";
 import minimist from "minimist";
@@ -19,8 +21,10 @@ const now = new Date();
 const costDate = now.getUTCHours() < 13 ? now : addDays(now, 1);
 
 const data = await fetchPrices(process.env.ENTSOE_TOKEN, costDate, argv.area);
-const areaPriceData = getAreaPriceData(data);
-const message = getMessage(areaPriceData);
+const intervalMinutes = getIntervalMinutes(data);
+const areaPriceData = getAreaPriceData(data, intervalMinutes);
+const pricePoints = toPricePoints(areaPriceData, intervalMinutes);
+const message = getMessage(pricePoints);
 
 if (argv.html) {
   console.log(`

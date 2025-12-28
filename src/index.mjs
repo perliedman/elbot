@@ -1,4 +1,11 @@
-import { addDays, addHours, format, startOfDay } from "date-fns";
+import {
+  addDays,
+  addHours,
+  addMinutes,
+  format,
+  intervalToDuration,
+  startOfDay,
+} from "date-fns";
 import { extent, mean, standardDeviation } from "simple-statistics";
 import sv from "date-fns/locale/sv/index.js";
 import p from "phin";
@@ -6,7 +13,7 @@ import { DOMParser, XMLSerializer } from "xmldom";
 import { login } from "masto";
 import { createReadStream } from "fs";
 
-const EUR_TO_SEK = 11.17;
+const EUR_TO_SEK = 11.03;
 
 const PRICE_DESCRIPTION = [
   [10, "🥰 Extremt billigt"],
@@ -89,6 +96,11 @@ export async function sendStatus(status, chartFile, accessToken, apiUrl) {
   await client.statuses.create({ status, mediaIds: [id] });
 }
 
+/**
+ *
+ * @param {Document} priceResponseDoc a parsed XML document from entsoe.eu containing price information for a selected area
+ * @returns {{start: Date, end: Date, price: number}[]} parsed price points with start and end times, prices are same currency as input document (EUR) and unit (MWh)
+ */
 export function getAreaPriceData(priceResponseDoc) {
   const timeEls = priceResponseDoc.getElementsByTagName("timeInterval");
 
@@ -104,34 +116,98 @@ export function getAreaPriceData(priceResponseDoc) {
   const start = new Date(
     timeIntervalEl.getElementsByTagName("start")[0].textContent
   );
+  const end = new Date(
+    timeIntervalEl.getElementsByTagName("end")[0].textContent
+  );
   const resolution =
     priceResponseDoc.getElementsByTagName("resolution")[0].textContent;
 
-  if (resolution !== "PT60M") {
+  const match = /PT(\d+)M/.exec(resolution);
+  if (!match) {
     throw new Error(`Unexpected resolution "${resolution}".`);
   }
+  const minuteRes = Number(match[1]);
 
   const pointEls = priceResponseDoc.getElementsByTagName("Point");
-  return Array.from(pointEls).map((pointEl, i) => ({
-    start: addHours(start, i),
-    end: addHours(start, i + 1),
-    price: Number(pointEl.getElementsByTagName("price.amount")[0].textContent),
-  }));
+  return Array.from(pointEls).map((pointEl, i) => {
+    const startPosition = Number(
+      pointEl.getElementsByTagName("position")[0].textContent
+    );
+    const endPosition =
+      i < pointEls.length - 1
+        ? Number(
+            pointEls[i + 1].getElementsByTagName("position")[0].textContent
+          )
+        : null;
+    return {
+      start: addMinutes(start, (startPosition - 1) * minuteRes),
+      end:
+        endPosition != null
+          ? addMinutes(start, (endPosition - 1) * minuteRes)
+          : end,
+      price: Number(
+        pointEl.getElementsByTagName("price.amount")[0].textContent
+      ),
+    };
+  });
 }
 
-export function getMessage(areaPriceData) {
-  if (areaPriceData.length !== 24) {
-    throw new Error(`Unexpected time series length: ${areaPriceData.length}`);
+export function getIntervalMinutes(data) {
+  const resolutionEl = data.getElementsByTagName("resolution");
+  if (resolutionEl.length !== 1)
+    throw new Error(
+      `Ambiguous or missing <resolution>, found ${resolutionEl.length}, expected exactly 1.`
+    );
+  const resolutionDef = resolutionEl[0].textContent;
+  const resolutionMatch = /PT(\d+)M/.exec(resolutionDef);
+  if (!resolutionMatch)
+    throw new Error(
+      `Resolution (\"${resolutionDef}\") did not match expected pattern`
+    );
+  return Number(resolutionMatch[1]);
+}
+
+/**
+ * Given prices with (possibly) irregular start/end points, creates time points with evenly space points
+ * @param {{start:Date, end:Date, price:number}[]} areaPriceData Price points, possibly irregular intervals
+ * @param {number} intervalMinutes Output price point interval length in minutes
+ * @returns {{start:Date, end:Date, price:number}[]} price points where interval is same for every point
+ */
+export function toPricePoints(areaPriceData, intervalMinutes) {
+  const result = [];
+  for (const priceData of areaPriceData) {
+    const duration = intervalToDuration(priceData);
+    const minutes = duration.hours * 60 + duration.minutes;
+    const nIntervals = minutes / intervalMinutes;
+    if (nIntervals !== Math.floor(nIntervals))
+      throw new Error("Price points use non-matching intervals");
+    for (let i = 0; i < nIntervals; i++) {
+      result.push({
+        start: addMinutes(priceData.start, intervalMinutes * i),
+        end: addMinutes(priceData.start, intervalMinutes * (i + 1)),
+        price: priceData.price,
+      });
+    }
   }
 
+  return result;
+}
+
+/**
+ *
+ * @param {{start:Date, end:Date, price:number}[]} pricePoints Price points in EUR/MWh, where all
+ * intervals are of the same length (as returned by `toPricePoints`)
+ * @returns {string} describing the day's prices
+ */
+export function getMessage(pricePoints) {
   // Recalculate to swedish öre / kWh
-  const pricePoints = areaPriceData.map(priceDataToPricePoint);
-  const avg = mean(pricePoints);
+  const sekPrices = pricePoints.map(priceDataToPricePoint);
+  const avg = mean(sekPrices);
 
   const peakHours = findPeakPeriods(pricePoints);
   const lowHours = findPeakPeriods(pricePoints.map((x) => -x));
   const header = `${capitalize(
-    format(areaPriceData[0].start, "EEEE yyyy-MM-dd", {
+    format(pricePoints[0].start, "EEEE yyyy-MM-dd", {
       locale: sv,
     })
   )}:\n\n`;
@@ -159,8 +235,8 @@ export function getMessage(areaPriceData) {
   }
 
   function periodToHours({ start, end }) {
-    const a = areaPriceData[start];
-    const b = areaPriceData[end];
+    const a = pricePoints[start];
+    const b = pricePoints[end];
     return `${format(new Date(a.start), "HH")}-${format(
       new Date(b.end),
       "kk"
@@ -168,15 +244,35 @@ export function getMessage(areaPriceData) {
   }
 }
 
-function findPeakPeriods(points) {
-  const [min] = extent(points);
-  const avg = mean(points);
-  const stdDev = standardDeviation(points);
+function findPeakPeriods(points, windowSize = 4) {
+  if (!Array.isArray(points) || points.length === 0) return [];
+
+  // Clamp window size
+  windowSize = Math.max(1, Math.min(windowSize, points.length));
+
+  // Build rolling average series
+  const rolling = new Array(points.length);
+  let sum = 0;
+  for (let i = 0; i < points.length; i++) {
+    sum += points[i];
+    if (i >= windowSize) {
+      sum -= points[i - windowSize];
+    }
+    const denom = Math.min(windowSize, i + 1);
+    rolling[i] = sum / denom;
+  }
+
+  // Compute thresholds on the smoothed series
+  const [min] = extent(rolling);
+  const avg = mean(rolling);
+  const stdDev = standardDeviation(rolling);
   const minDiff = Math.max(avg * 0.8, 2 * stdDev);
+
   const hiPeriods = [];
   let currentPeriod;
-  for (let i = 0; i < points.length; i++) {
-    const pricePoint = points[i];
+
+  for (let i = 0; i < rolling.length; i++) {
+    const pricePoint = rolling[i];
     if (pricePoint > min + minDiff) {
       if (currentPeriod) {
         currentPeriod.end = i;
