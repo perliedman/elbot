@@ -26,7 +26,7 @@ const PRICE_DESCRIPTION = [
 
 // Energiskatt + elöverföringsavgift
 // https://www.eon.se/content/dam/eon-se/swe-documents/swe-prislista-lag-syd-220701.pdf
-const PRICE_OVERHEAD_KWH = 45 + 82;
+const PRICE_OVERHEAD_KWH = 45 + 39;
 
 export function priceDescription(x) {
   let i;
