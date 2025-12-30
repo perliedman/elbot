@@ -213,8 +213,8 @@ export function getMessage(pricePoints, eurToSek) {
   const sekPrices = pricePoints.map((p) => priceDataToPricePoint(eurToSek, p));
   const avg = mean(sekPrices);
 
-  const peakHours = findPeakPeriods(pricePoints);
-  const lowHours = findPeakPeriods(pricePoints.map((x) => -x));
+  const peakHours = findPeakPeriods(sekPrices);
+  const lowHours = findPeakPeriods(sekPrices.map((x) => -x));
   const header = `${capitalize(
     format(pricePoints[0].start, "EEEE yyyy-MM-dd", {
       locale: sv,
@@ -253,7 +253,7 @@ export function getMessage(pricePoints, eurToSek) {
   }
 }
 
-function findPeakPeriods(points, windowSize = 4) {
+export function findPeakPeriods(points, windowSize = 4) {
   if (!Array.isArray(points) || points.length === 0) return [];
 
   // Clamp window size

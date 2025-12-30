@@ -2,6 +2,7 @@ import fs from "node:fs";
 import { DOMParser } from "xmldom";
 import { expect, test } from "vitest";
 import {
+  findPeakPeriods,
   getAreaPriceData,
   getEuroConversionRates,
   getIntervalMinutes,
@@ -73,6 +74,8 @@ test("getMessage", () => {
   expect(message).toContain("😊");
   expect(message).toContain("12 öre/kWh");
   expect(message).toContain("6 kr");
+  expect(message).toContain("Undvik klockan 16-20");
+  expect(message).toContain("Föredra klockan 00-15 och 22-24");
 });
 
 test("getEuroConversionRates", async () => {
@@ -82,4 +85,16 @@ test("getEuroConversionRates", async () => {
   expect(rates.sek).toBeTypeOf("number");
   expect(rates.sek).toBeGreaterThan(5);
   expect(rates.sek).toBeLessThan(15);
+});
+
+test("getPeakHours", () => {
+  const xml = fs.readFileSync("test/testdata-1.xml", "utf-8");
+  const doc = new DOMParser().parseFromString(xml);
+  const priceData = getAreaPriceData(doc);
+  const pricePoints = toPricePoints(priceData, 15);
+  const sekPrices = pricePoints.map(({ price }) => price * 11.03);
+  const peakHours = findPeakPeriods(sekPrices);
+  expect(peakHours.length).toBe(1);
+  expect(peakHours[0].start).toBe(64);
+  expect(peakHours[0].end).toBe(82);
 });
